@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "106130483704",
+    "project_id": "runrace-ee966",
+    "storage_bucket": "runrace-ee966.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:106130483704:android:8dcc19f791ad4ce3a00e0d",
+        "android_client_info": {
+          "package_name": "com.example.notracerun_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxTtn-MmrxBQV77Qr_uGfNMeNR9JuA1a0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

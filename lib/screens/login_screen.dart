@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authService = AuthService();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: Padding(
@@ -12,29 +15,25 @@ class LoginScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Username',
-                border: OutlineInputBorder(),
-              ),
-            ),
             const SizedBox(height: 20),
-            const TextField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () =>
-                  Navigator.pushReplacementNamed(context, '/modeSelect'),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.login),
+              label: const Text('Continue with Google'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.tealAccent,
+                backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
               ),
-              child: const Text('Login'),
+              onPressed: () async {
+                try {
+                  await authService.signInWithGoogle();
+                  // On success, go to the same place as normal login
+                  Navigator.pushReplacementNamed(context, '/modeSelect');
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Google sign-in failed: $e')),
+                  );
+                }
+              },
             ),
           ],
         ),

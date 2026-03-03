@@ -5,8 +5,13 @@ import 'screens/mode_select_screen.dart';
 import 'screens/story_mode_screen.dart';
 import 'screens/open_mode_screen.dart';
 
-void main() {
-  runApp(NoTraceRunApp());
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const NoTraceRunApp());
 }
 
 class NoTraceRunApp extends StatelessWidget {
