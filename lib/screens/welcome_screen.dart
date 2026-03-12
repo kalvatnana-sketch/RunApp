@@ -34,7 +34,9 @@ class WelcomeScreen extends StatelessWidget {
                   backgroundColor: Colors.tealAccent,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 60, vertical: 18),
+                    horizontal: 60,
+                    vertical: 18,
+                  ),
                   textStyle: const TextStyle(fontSize: 18),
                 ),
                 child: const Text('Enter the Run'),

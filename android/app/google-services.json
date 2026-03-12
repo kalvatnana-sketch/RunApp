@@ -12,7 +12,20 @@
           "package_name": "com.example.notracerun_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "106130483704-q5b0v5vmvb9thmagc34avspn9d6lgn54.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.notracerun_app",
+            "certificate_hash": "5b5a5d26bd25e45006019fa11cf02dec9a368350"
+          }
+        },
+        {
+          "client_id": "106130483704-ctf1clnge3oq55622jkbh24g7emm6764.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCxTtn-MmrxBQV77Qr_uGfNMeNR9JuA1a0"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "106130483704-ctf1clnge3oq55622jkbh24g7emm6764.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
