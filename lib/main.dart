@@ -9,6 +9,7 @@ import 'screens/open_mode_screen.dart';
 import 'screens/home_screen.dart';
 import 'firebase_options.dart';
 import 'screens/register_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,7 @@ class NoTraceRunApp extends StatelessWidget {
         '/openMode': (context) => const OpenModeScreen(),
         '/home': (context) => const HomeScreen(),
         '/register': (context) => const RegisterScreen(),
+        '/settings': (context) => const SettingsScreen(),
       },
     );
   }
