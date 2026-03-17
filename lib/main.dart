@@ -8,6 +8,7 @@ import 'screens/story_mode_screen.dart';
 import 'screens/open_mode_screen.dart';
 import 'screens/home_screen.dart';
 import 'firebase_options.dart';
+import 'screens/register_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,13 +25,42 @@ class NoTraceRunApp extends StatelessWidget {
       title: 'NoTraceRun',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.dark(
-          primary: Colors.tealAccent,
-          secondary: Colors.cyanAccent,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
+
+        fontFamily: 'JetBrainsMono',
+
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF00FF9C),
+          secondary: Color(0xFF00E5FF),
         ),
-        scaffoldBackgroundColor: Colors.black,
+
         textTheme: const TextTheme(
-          bodyMedium: TextStyle(color: Colors.white70),
+          bodyMedium: TextStyle(color: Color(0xFF00FF9C), letterSpacing: 1.2),
+        ),
+
+        inputDecorationTheme: const InputDecorationTheme(
+          border: UnderlineInputBorder(),
+          enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF00FF9C)),
+          ),
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF00FF9C), width: 2),
+          ),
+          labelStyle: TextStyle(color: Color(0xFF00FF9C)),
+        ),
+
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Color(0xFF00FF9C),
+            side: BorderSide(color: Color(0xFF00FF9C)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          ),
+        ),
+
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(foregroundColor: Color(0xFF00FF9C)),
         ),
       ),
       initialRoute: '/',
@@ -41,6 +71,7 @@ class NoTraceRunApp extends StatelessWidget {
         '/storyMode': (context) => const StoryModeScreen(),
         '/openMode': (context) => const OpenModeScreen(),
         '/home': (context) => const HomeScreen(),
+        '/register': (context) => const RegisterScreen(),
       },
     );
   }

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _authService = AuthService();
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
 
   bool _isLoading = false;
 
@@ -23,6 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -33,58 +36,55 @@ class _LoginScreenState extends State<LoginScreen> {
     ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.black));
   }
 
-  Future<void> _login() async {
+  Future<void> _register() async {
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    final pass = _passwordController.text.trim();
+    final confirm = _confirmController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      _log("INPUT INCOMPLETE");
+    if (email.isEmpty || pass.isEmpty || confirm.isEmpty) {
+      _log("FIELDS INCOMPLETE");
+      return;
+    }
+
+    if (pass != confirm) {
+      _log("KEY MISMATCH");
       return;
     }
 
     setState(() => _isLoading = true);
 
+    /// fake delay for system feel
     await Future.delayed(const Duration(seconds: 1));
 
     try {
-      await _authService.signInWithEmail(email, password);
+      await _authService.registerWithEmail(email, pass);
 
-      _log("ACCESS GRANTED");
+      _log("PROFILE CREATED");
 
       await Future.delayed(const Duration(milliseconds: 600));
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/home');
-    } catch (_) {
-      _log("ACCESS DENIED");
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+    } on FirebaseAuthException catch (e) {
+      String msg = "REGISTRATION FAILED";
 
-  Future<void> _forgotPassword() async {
-    final email = _emailController.text.trim();
+      switch (e.code) {
+        case 'email-already-in-use':
+          msg = 'IDENTIFIER EXISTS';
+          break;
+        case 'weak-password':
+          msg = 'WEAK KEY';
+          break;
+        case 'invalid-email':
+          msg = 'FORMAT INVALID';
+          break;
+      }
 
-    if (email.isEmpty) {
-      _log("IDENTIFIER REQUIRED");
-      return;
-    }
-
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      _log("RESET SENT");
+      _log(msg);
     } catch (_) {
       _log("ERROR");
-    }
-  }
-
-  Future<void> _googleLogin() async {
-    try {
-      await _authService.signInWithGoogle();
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (_) {
-      _log("EXTERNAL AUTH FAILED");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -119,15 +119,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    /// HEADER
                     Text(
-                      "SECURE ACCESS PANEL",
+                      "AGENT REGISTRATION",
                       style: TextStyle(color: primary, letterSpacing: 2),
                     ),
 
                     const SizedBox(height: 4),
 
                     Text(
-                      "CLEARANCE REQUIRED",
+                      "LEVEL 1 CLEARANCE",
                       style: TextStyle(
                         color: accent,
                         fontSize: 11,
@@ -137,6 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const Divider(height: 30),
 
+                    /// EMAIL
                     TextField(
                       controller: _emailController,
                       style: TextStyle(color: primary),
@@ -145,8 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
+                    /// PASSWORD
                     TextField(
                       controller: _passwordController,
                       obscureText: true,
@@ -156,46 +159,31 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
 
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _forgotPassword,
-                        child: const Text("REQUEST RESET"),
+                    /// CONFIRM
+                    TextField(
+                      controller: _confirmController,
+                      obscureText: true,
+                      style: TextStyle(color: primary),
+                      decoration: const InputDecoration(
+                        labelText: "CONFIRM KEY",
                       ),
                     ),
 
-                    const Divider(height: 30),
+                    const SizedBox(height: 24),
 
+                    /// BUTTON
                     if (_isLoading)
                       Center(child: CircularProgressIndicator(color: primary))
-                    else ...[
+                    else
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _login,
-                          child: const Text("AUTHORIZE ACCESS"),
+                          onPressed: _register,
+                          child: const Text("INITIALIZE AGENT"),
                         ),
                       ),
-
-                      const SizedBox(height: 12),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.pushNamed(context, '/register'),
-                            child: const Text("NEW AGENT"),
-                          ),
-                          TextButton(
-                            onPressed: _googleLogin,
-                            child: const Text("EXTERNAL AUTH"),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
