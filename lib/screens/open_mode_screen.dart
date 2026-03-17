@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -30,15 +31,62 @@ class _OpenModeScreenState extends State<OpenModeScreen> {
   String? error;
   List<Poi> pois = [];
 
+  // #region agent log
+  void _debugLog({
+    required String hypothesisId,
+    required String location,
+    required String message,
+    Map<String, dynamic>? data,
+    String runId = 'initial',
+  }) {
+    try {
+      final logEntry = <String, dynamic>{
+        'sessionId': '5821fa',
+        'id': 'log_${DateTime.now().millisecondsSinceEpoch}',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'location': location,
+        'message': message,
+        'data': data ?? <String, dynamic>{},
+        'runId': runId,
+        'hypothesisId': hypothesisId,
+      };
+      final file = File(
+          '/Users/anastasiakalvatn/Documents/notracerun_app/.cursor/debug-5821fa.log');
+      file.writeAsStringSync('${jsonEncode(logEntry)}\n',
+          mode: FileMode.append, flush: true);
+    } catch (_) {
+      // Swallow all logging errors
+    }
+  }
+  // #endregion
+
   @override
   void initState() {
     super.initState();
+    _debugLog(
+      hypothesisId: 'H3',
+      location: 'open_mode_screen.dart:initState',
+      message: 'OpenModeScreen initState called',
+      data: {},
+    );
     _initLocation();
   }
 
   Future<void> _initLocation() async {
+    _debugLog(
+      hypothesisId: 'H1',
+      location: 'open_mode_screen.dart:_initLocation',
+      message: 'initLocation_start',
+      data: {},
+    );
     final enabled = await Geolocator.isLocationServiceEnabled();
     if (!enabled) {
+      _debugLog(
+        hypothesisId: 'H2',
+        location: 'open_mode_screen.dart:_initLocation',
+        message: 'location_services_disabled',
+        data: {},
+      );
       setState(() => error = "Location services disabled");
       return;
     }
@@ -49,11 +97,27 @@ class _OpenModeScreenState extends State<OpenModeScreen> {
     }
     if (perm == LocationPermission.deniedForever ||
         perm == LocationPermission.denied) {
+      _debugLog(
+        hypothesisId: 'H2',
+        location: 'open_mode_screen.dart:_initLocation',
+        message: 'location_permission_denied',
+        data: {'perm': perm.toString()},
+      );
       setState(() => error = "Location permission denied");
       return;
     }
 
     final pos = await Geolocator.getCurrentPosition();
+    _debugLog(
+      hypothesisId: 'H1',
+      location: 'open_mode_screen.dart:_initLocation',
+      message: 'got_position',
+      data: {
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+        'timestamp': pos.timestamp?.toIso8601String(),
+      },
+    );
     setState(() {
       me = LatLng(pos.latitude, pos.longitude);
       error = null;
@@ -72,6 +136,15 @@ class _OpenModeScreenState extends State<OpenModeScreen> {
 
     final lat = me!.latitude;
     final lon = me!.longitude;
+    _debugLog(
+      hypothesisId: 'H1',
+      location: 'open_mode_screen.dart:_fetchPois',
+      message: 'fetch_pois_with_center',
+      data: {
+        'latitude': lat,
+        'longitude': lon,
+      },
+    );
     const radiusMeters = 1200;
 
     final query = """
