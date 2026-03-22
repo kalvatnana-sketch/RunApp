@@ -1,19 +1,18 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-enum PoiType { worship, school, grocery, hospital, fuel }
+enum PoiType { fuel, restaurant }
 
 class Poi {
   final PoiType type;
   final LatLng point;
-  final String name;
 
-  Poi({required this.type, required this.point, required this.name});
+  Poi({required this.type, required this.point});
 }
 
 class OpenModeScreen extends StatefulWidget {
@@ -23,104 +22,60 @@ class OpenModeScreen extends StatefulWidget {
   State<OpenModeScreen> createState() => _OpenModeScreenState();
 }
 
-class _OpenModeScreenState extends State<OpenModeScreen> {
+class _OpenModeScreenState extends State<OpenModeScreen>
+    with TickerProviderStateMixin {
   final mapController = MapController();
   LatLng? me;
 
-  bool loading = false;
-  String? error;
+  final Color neonGreen = const Color(0xFF00C98D);
+  final Color neonBlue = const Color(0xFF00E5FF);
+
   List<Poi> pois = [];
 
-  // #region agent log
-  void _debugLog({
-    required String hypothesisId,
-    required String location,
-    required String message,
-    Map<String, dynamic>? data,
-    String runId = 'initial',
-  }) {
-    try {
-      final logEntry = <String, dynamic>{
-        'sessionId': '5821fa',
-        'id': 'log_${DateTime.now().millisecondsSinceEpoch}',
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'location': location,
-        'message': message,
-        'data': data ?? <String, dynamic>{},
-        'runId': runId,
-        'hypothesisId': hypothesisId,
-      };
-      final file = File(
-          '/Users/anastasiakalvatn/Documents/notracerun_app/.cursor/debug-5821fa.log');
-      file.writeAsStringSync('${jsonEncode(logEntry)}\n',
-          mode: FileMode.append, flush: true);
-    } catch (_) {
-      // Swallow all logging errors
-    }
-  }
-  // #endregion
+  late AnimationController _scanController;
+  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
-    _debugLog(
-      hypothesisId: 'H3',
-      location: 'open_mode_screen.dart:initState',
-      message: 'OpenModeScreen initState called',
-      data: {},
-    );
     _initLocation();
+
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _scanController.dispose();
+    _pulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _initLocation() async {
-    _debugLog(
-      hypothesisId: 'H1',
-      location: 'open_mode_screen.dart:_initLocation',
-      message: 'initLocation_start',
-      data: {},
-    );
     final enabled = await Geolocator.isLocationServiceEnabled();
-    if (!enabled) {
-      _debugLog(
-        hypothesisId: 'H2',
-        location: 'open_mode_screen.dart:_initLocation',
-        message: 'location_services_disabled',
-        data: {},
-      );
-      setState(() => error = "Location services disabled");
-      return;
-    }
+    if (!enabled) return;
 
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
-    if (perm == LocationPermission.deniedForever ||
-        perm == LocationPermission.denied) {
-      _debugLog(
-        hypothesisId: 'H2',
-        location: 'open_mode_screen.dart:_initLocation',
-        message: 'location_permission_denied',
-        data: {'perm': perm.toString()},
-      );
-      setState(() => error = "Location permission denied");
+
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
       return;
     }
 
     final pos = await Geolocator.getCurrentPosition();
-    _debugLog(
-      hypothesisId: 'H1',
-      location: 'open_mode_screen.dart:_initLocation',
-      message: 'got_position',
-      data: {
-        'latitude': pos.latitude,
-        'longitude': pos.longitude,
-        'timestamp': pos.timestamp?.toIso8601String(),
-      },
-    );
+
     setState(() {
       me = LatLng(pos.latitude, pos.longitude);
-      error = null;
     });
 
     await _fetchPois();
@@ -129,303 +84,187 @@ class _OpenModeScreenState extends State<OpenModeScreen> {
   Future<void> _fetchPois() async {
     if (me == null) return;
 
-    setState(() {
-      loading = true;
-      error = null;
-    });
-
     final lat = me!.latitude;
     final lon = me!.longitude;
-    _debugLog(
-      hypothesisId: 'H1',
-      location: 'open_mode_screen.dart:_fetchPois',
-      message: 'fetch_pois_with_center',
-      data: {
-        'latitude': lat,
-        'longitude': lon,
-      },
-    );
-    const radiusMeters = 1200;
 
-    final query = """
-[out:json][timeout:25];
+    final query =
+        """
+[out:json];
 (
-  node(around:$radiusMeters,$lat,$lon)["amenity"="place_of_worship"];
-  node(around:$radiusMeters,$lat,$lon)["amenity"="school"];
-  node(around:$radiusMeters,$lat,$lon)["shop"="supermarket"];
-  node(around:$radiusMeters,$lat,$lon)["shop"="convenience"];
-  node(around:$radiusMeters,$lat,$lon)["amenity"="hospital"];
-  node(around:$radiusMeters,$lat,$lon)["amenity"="fuel"];
+  node(around:1000,$lat,$lon)["amenity"="fuel"];
+  node(around:1000,$lat,$lon)["amenity"="restaurant"];
 );
-out center tags;
+out;
 """;
 
-    try {
-      final uri = Uri.parse("https://overpass-api.de/api/interpreter");
-      final resp = await http.post(
-        uri,
-        headers: {"Content-Type": "application/x-www-form-urlencoded"},
-        body: {"data": query},
-      );
+    final resp = await http.post(
+      Uri.parse("https://overpass-api.de/api/interpreter"),
+      body: {"data": query},
+    );
 
-      if (resp.statusCode != 200) {
-        throw Exception("Overpass error: HTTP ${resp.statusCode}");
+    final data = jsonDecode(resp.body);
+    final elements = data["elements"] as List;
+
+    final List<Poi> parsed = [];
+
+    for (final el in elements) {
+      final lat = el["lat"];
+      final lon = el["lon"];
+      final tags = el["tags"] ?? {};
+
+      if (tags["amenity"] == "fuel") {
+        parsed.add(Poi(type: PoiType.fuel, point: LatLng(lat, lon)));
       }
 
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      final elements = (data["elements"] as List).cast<Map<String, dynamic>>();
-
-      final List<Poi> parsed = [];
-
-      for (final el in elements) {
-        final elLat = el["lat"] as num?;
-        final elLon = el["lon"] as num?;
-        if (elLat == null || elLon == null) continue;
-
-        final tags = (el["tags"] as Map?)?.cast<String, dynamic>() ?? {};
-        final name = (tags["name"] as String?)?.trim();
-        final amenity = tags["amenity"] as String?;
-        final shop = tags["shop"] as String?;
-
-        PoiType? type;
-        if (amenity == "place_of_worship") type = PoiType.worship;
-        if (amenity == "school") type = PoiType.school;
-        if (amenity == "hospital") type = PoiType.hospital;
-        if (amenity == "fuel") type = PoiType.fuel;
-        if (shop == "supermarket" || shop == "convenience") type = PoiType.grocery;
-
-        if (type == null) continue;
-
-        parsed.add(
-          Poi(
-            type: type,
-            point: LatLng(elLat.toDouble(), elLon.toDouble()),
-            name: name ?? _defaultName(type),
-          ),
-        );
+      if (tags["amenity"] == "restaurant") {
+        parsed.add(Poi(type: PoiType.restaurant, point: LatLng(lat, lon)));
       }
-
-      setState(() {
-        pois = parsed;
-        loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        loading = false;
-        error = e.toString();
-      });
     }
-  }
 
-  String _defaultName(PoiType t) {
-    switch (t) {
-      case PoiType.worship:
-        return "Church / Worship";
-      case PoiType.school:
-        return "School";
-      case PoiType.grocery:
-        return "Grocery";
-      case PoiType.hospital:
-        return "Hospital";
-      case PoiType.fuel:
-        return "Gas Station";
-    }
-  }
-
-  IconData _iconFor(PoiType t) {
-    switch (t) {
-      case PoiType.worship:
-        return Icons.account_balance;
-      case PoiType.school:
-        return Icons.school;
-      case PoiType.grocery:
-        return Icons.local_grocery_store;
-      case PoiType.hospital:
-        return Icons.local_hospital;
-      case PoiType.fuel:
-        return Icons.local_gas_station;
-    }
-  }
-
-  Color _colorFor(PoiType t) {
-    switch (t) {
-      case PoiType.worship:
-        return Colors.purpleAccent;
-      case PoiType.school:
-        return Colors.lightBlueAccent;
-      case PoiType.grocery:
-        return Colors.greenAccent;
-      case PoiType.hospital:
-        return Colors.redAccent;
-      case PoiType.fuel:
-        return Colors.orangeAccent;
-    }
+    setState(() {
+      pois = parsed;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final center = me ?? const LatLng(59.9139, 10.7522);
+    if (me == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-    final markers = <Marker>[
-      // Me
+    final markers = [
+      // Player
       Marker(
-        point: center,
-        width: 44,
-        height: 44,
-        child: const Icon(Icons.my_location, color: Colors.cyanAccent, size: 30),
+        point: me!,
+        width: 40,
+        height: 40,
+        child: Container(
+          decoration: BoxDecoration(
+            color: neonGreen,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: neonGreen.withOpacity(0.8),
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        ),
       ),
+
       // POIs
       ...pois.map((p) {
         return Marker(
           point: p.point,
-          width: 46,
-          height: 46,
-          child: Tooltip(
-            message: p.name,
-            child: Icon(_iconFor(p.type), color: _colorFor(p.type), size: 30),
+          width: 40,
+          height: 40,
+          child: Icon(
+            p.type == PoiType.fuel ? Icons.local_gas_station : Icons.restaurant,
+            color: p.type == PoiType.fuel ? Colors.orange : Colors.redAccent,
           ),
         );
       }),
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Open Mode'),
-        actions: [
-          IconButton(
-            onPressed: loading ? null : _fetchPois,
-            icon: const Icon(Icons.refresh),
-            tooltip: "Refresh POIs",
-          ),
-        ],
-      ),
       body: Stack(
         children: [
-          // MAP
+          /// 🗺️ DARK MAP TILE
           FlutterMap(
             mapController: mapController,
             options: MapOptions(
-              initialCenter: center,
+              initialCenter: me!,
               initialZoom: 16,
+              minZoom: 5,
+              maxZoom: 18,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all,
+              ),
             ),
             children: [
               TileLayer(
-                urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                urlTemplate:
+                    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+                subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: "com.example.spy_game",
               ),
               MarkerLayer(markers: markers),
             ],
           ),
 
-          // STATUS CHIP (top-left)
-          Positioned(
-            left: 12,
-            top: 12,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Text(
-                  loading
-                      ? "Scanning nearby…"
-                      : error != null
-                          ? "Error: $error"
-                          : "POIs: ${pois.length}",
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
+          /// 🌑 DARK OVERLAY
+          Container(color: Colors.black.withOpacity(0.4)),
+
+          /// 📡 SCAN LINES
+          Opacity(
+            opacity: 0.08,
+            child: AnimatedBuilder(
+              animation: _scanController,
+              builder: (_, __) {
+                return CustomPaint(
+                  painter: _ScanLinePainter(_scanController.value),
+                  size: Size.infinite,
+                );
+              },
             ),
           ),
 
-          // BOTTOM MAP COVER PANEL (like your sketch)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.35,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B0F14).withOpacity(0.92),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(50),
+          /// 🎯 RADAR PULSE
+          Center(
+            child: AnimatedBuilder(
+              animation: _pulseController,
+              builder: (_, __) {
+                double scale = 1 + _pulseController.value * 2;
+
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: neonGreen.withOpacity(
+                          1 - _pulseController.value,
+                        ),
+                        width: 2,
+                      ),
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                      color: Colors.black.withOpacity(0.35),
-                    ),
-                  ],
+                );
+              },
+            ),
+          ),
+
+          /// 🔍 ZOOM BUTTONS
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: Column(
+              children: [
+                FloatingActionButton(
+                  heroTag: "zoom_in",
+                  mini: true,
+                  backgroundColor: Colors.black,
+                  onPressed: () {
+                    final z = mapController.camera.zoom;
+                    mapController.move(mapController.camera.center, z + 1);
+                  },
+                  child: Icon(Icons.add, color: neonBlue),
                 ),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    Container(
-                      width: 48,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      "Map",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      loading
-                          ? "Scanning nearby locations…"
-                          : "Nearby: ${pois.length} points",
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        children: [
-                          _LegendRow(
-                              icon: Icons.account_balance,
-                              label: "Church / Worship",
-                              color: Colors.purpleAccent),
-                          _LegendRow(
-                              icon: Icons.school,
-                              label: "School",
-                              color: Colors.lightBlueAccent),
-                          _LegendRow(
-                              icon: Icons.local_grocery_store,
-                              label: "Grocery",
-                              color: Colors.greenAccent),
-                          _LegendRow(
-                              icon: Icons.local_hospital,
-                              label: "Hospital",
-                              color: Colors.redAccent),
-                          _LegendRow(
-                              icon: Icons.local_gas_station,
-                              label: "Gas Station",
-                              color: Colors.orangeAccent),
-                          const SizedBox(height: 12),
-                          if (error != null)
-                            Text(
-                              error!,
-                              style: const TextStyle(color: Colors.redAccent),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 8),
+                FloatingActionButton(
+                  heroTag: "zoom_out",
+                  mini: true,
+                  backgroundColor: Colors.black,
+                  onPressed: () {
+                    final z = mapController.camera.zoom;
+                    mapController.move(mapController.camera.center, z - 1);
+                  },
+                  child: Icon(Icons.remove, color: neonBlue),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -434,28 +273,25 @@ out center tags;
   }
 }
 
-class _LegendRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _LegendRow({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+class _ScanLinePainter extends CustomPainter {
+  final double progress;
+  _ScanLinePainter(this.progress);
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(color: Colors.white)),
-        ],
-      ),
-    );
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF00E5FF).withOpacity(0.05)
+      ..strokeWidth = 1;
+
+    for (double y = 0; y < size.height; y += 4) {
+      canvas.drawLine(
+        Offset(0, y + progress * 4),
+        Offset(size.width, y + progress * 4),
+        paint,
+      );
+    }
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
