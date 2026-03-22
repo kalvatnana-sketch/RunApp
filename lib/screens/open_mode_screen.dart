@@ -1,12 +1,21 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-enum PoiType { fuel, restaurant }
+enum PoiType {
+  fuel,
+  restaurant,
+  cafe,
+  hospital,
+  police,
+  bank,
+  supermarket,
+  pharmacy,
+  parking,
+}
 
 class Poi {
   final PoiType type;
@@ -31,6 +40,12 @@ class _OpenModeScreenState extends State<OpenModeScreen>
   final Color neonBlue = const Color(0xFF00E5FF);
 
   List<Poi> pois = [];
+
+  /// 🎮 GAME STATS
+  double health = 0.75;
+  int coins = 120;
+  int level = 3;
+  double xpProgress = 0.4;
 
   late AnimationController _scanController;
   late AnimationController _pulseController;
@@ -91,8 +106,15 @@ class _OpenModeScreenState extends State<OpenModeScreen>
         """
 [out:json];
 (
-  node(around:1000,$lat,$lon)["amenity"="fuel"];
-  node(around:1000,$lat,$lon)["amenity"="restaurant"];
+  node(around:10000,$lat,$lon)["amenity"="fuel"];
+  node(around:10000,$lat,$lon)["amenity"="restaurant"];
+  node(around:10000,$lat,$lon)["amenity"="cafe"];
+  node(around:10000,$lat,$lon)["amenity"="hospital"];
+  node(around:10000,$lat,$lon)["amenity"="police"];
+  node(around:10000,$lat,$lon)["amenity"="bank"];
+  node(around:10000,$lat,$lon)["shop"="supermarket"];
+  node(around:10000,$lat,$lon)["amenity"="pharmacy"];
+  node(around:10000,$lat,$lon)["amenity"="parking"];
 );
 out;
 """;
@@ -112,18 +134,103 @@ out;
       final lon = el["lon"];
       final tags = el["tags"] ?? {};
 
-      if (tags["amenity"] == "fuel") {
-        parsed.add(Poi(type: PoiType.fuel, point: LatLng(lat, lon)));
-      }
+      final amenity = tags["amenity"];
+      final shop = tags["shop"];
 
-      if (tags["amenity"] == "restaurant") {
-        parsed.add(Poi(type: PoiType.restaurant, point: LatLng(lat, lon)));
+      PoiType? type;
+
+      if (amenity == "fuel")
+        type = PoiType.fuel;
+      else if (amenity == "restaurant")
+        type = PoiType.restaurant;
+      else if (amenity == "cafe")
+        type = PoiType.cafe;
+      else if (amenity == "hospital")
+        type = PoiType.hospital;
+      else if (amenity == "police")
+        type = PoiType.police;
+      else if (amenity == "bank")
+        type = PoiType.bank;
+      else if (amenity == "pharmacy")
+        type = PoiType.pharmacy;
+      else if (amenity == "parking")
+        type = PoiType.parking;
+      else if (shop == "supermarket")
+        type = PoiType.supermarket;
+
+      if (type != null) {
+        parsed.add(Poi(type: type, point: LatLng(lat, lon)));
       }
     }
 
     setState(() {
       pois = parsed;
     });
+  }
+
+  IconData _getIcon(PoiType type) {
+    switch (type) {
+      case PoiType.fuel:
+        return Icons.local_gas_station;
+      case PoiType.restaurant:
+        return Icons.restaurant;
+      case PoiType.cafe:
+        return Icons.local_cafe;
+      case PoiType.hospital:
+        return Icons.local_hospital;
+      case PoiType.police:
+        return Icons.local_police;
+      case PoiType.bank:
+        return Icons.account_balance;
+      case PoiType.supermarket:
+        return Icons.shopping_cart;
+      case PoiType.pharmacy:
+        return Icons.medical_services;
+      case PoiType.parking:
+        return Icons.local_parking;
+    }
+  }
+
+  Color _getColor(PoiType type) {
+    switch (type) {
+      case PoiType.fuel:
+        return Colors.orange;
+      case PoiType.restaurant:
+        return Colors.redAccent;
+      case PoiType.cafe:
+        return Colors.brown;
+      case PoiType.hospital:
+        return Colors.red;
+      case PoiType.police:
+        return Colors.blue;
+      case PoiType.bank:
+        return Colors.green;
+      case PoiType.supermarket:
+        return Colors.teal;
+      case PoiType.pharmacy:
+        return Colors.pink;
+      case PoiType.parking:
+        return Colors.indigo;
+    }
+  }
+
+  Widget _buildBar(String label, double value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white)),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: value,
+            minHeight: 8,
+            backgroundColor: Colors.white12,
+            valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -133,7 +240,6 @@ out;
     }
 
     final markers = [
-      // Player
       Marker(
         point: me!,
         width: 40,
@@ -153,16 +259,12 @@ out;
         ),
       ),
 
-      // POIs
       ...pois.map((p) {
         return Marker(
           point: p.point,
           width: 40,
           height: 40,
-          child: Icon(
-            p.type == PoiType.fuel ? Icons.local_gas_station : Icons.restaurant,
-            color: p.type == PoiType.fuel ? Colors.orange : Colors.redAccent,
-          ),
+          child: Icon(_getIcon(p.type), color: _getColor(p.type)),
         );
       }),
     ];
@@ -170,7 +272,7 @@ out;
     return Scaffold(
       body: Stack(
         children: [
-          /// 🗺️ DARK MAP TILE
+          /// 🗺️ MAP
           FlutterMap(
             mapController: mapController,
             options: MapOptions(
@@ -193,47 +295,35 @@ out;
             ],
           ),
 
-          /// 🌑 DARK OVERLAY
-          Container(color: Colors.black.withOpacity(0.4)),
+          /// 🌑 OVERLAY (FIXED)
+          IgnorePointer(child: Container(color: Colors.black.withOpacity(0.4))),
 
-          /// 📡 SCAN LINES
-          Opacity(
-            opacity: 0.08,
-            child: AnimatedBuilder(
-              animation: _scanController,
-              builder: (_, __) {
-                return CustomPaint(
-                  painter: _ScanLinePainter(_scanController.value),
-                  size: Size.infinite,
-                );
-              },
-            ),
-          ),
-
-          /// 🎯 RADAR PULSE
-          Center(
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (_, __) {
-                double scale = 1 + _pulseController.value * 2;
-
-                return Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: neonGreen.withOpacity(
-                          1 - _pulseController.value,
-                        ),
-                        width: 2,
+          /// 🎮 HUD
+          Positioned(
+            top: 50,
+            left: 16,
+            right: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildBar("HP", health, Colors.red),
+                const SizedBox(height: 8),
+                _buildBar("LVL $level", xpProgress, neonBlue),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.monetization_on, color: Colors.amber),
+                    const SizedBox(width: 6),
+                    Text(
+                      "$coins",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ],
             ),
           ),
 
@@ -271,27 +361,4 @@ out;
       ),
     );
   }
-}
-
-class _ScanLinePainter extends CustomPainter {
-  final double progress;
-  _ScanLinePainter(this.progress);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF00E5FF).withOpacity(0.05)
-      ..strokeWidth = 1;
-
-    for (double y = 0; y < size.height; y += 4) {
-      canvas.drawLine(
-        Offset(0, y + progress * 4),
-        Offset(size.width, y + progress * 4),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
